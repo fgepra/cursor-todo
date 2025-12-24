@@ -47,6 +47,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +103,7 @@ export default function HomePage() {
   const [isGeneratingToday, setIsGeneratingToday] = React.useState(false);
   const [isGeneratingWeek, setIsGeneratingWeek] = React.useState(false);
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [isProfileOpen, setIsProfileOpen] = React.useState(false);
   const itemsPerPage = 5;
 
   // 테마 마운트 처리 (hydration 오류 방지)
@@ -212,6 +220,33 @@ export default function HomePage() {
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, priorityFilter, categoryFilter, sortOption]);
+
+  // 프로필 통계 계산
+  const profileStats = React.useMemo(() => {
+    const totalTodos = todos.length;
+    const completedTodos = todos.filter(t => t.completed).length;
+    const completionRate = totalTodos > 0 ? Math.round((completedTodos / totalTodos) * 100) : 0;
+
+    const priorityStats = {
+      high: { total: 0, completed: 0 },
+      medium: { total: 0, completed: 0 },
+      low: { total: 0, completed: 0 },
+    };
+
+    todos.forEach(todo => {
+      priorityStats[todo.priority].total++;
+      if (todo.completed) {
+        priorityStats[todo.priority].completed++;
+      }
+    });
+
+    return {
+      totalTodos,
+      completedTodos,
+      completionRate,
+      priorityStats,
+    };
+  }, [todos]);
 
   // 핸들러 함수들
   const handleFormSubmit = async (data: TodoFormData) => {
@@ -344,21 +379,41 @@ export default function HomePage() {
               >
                 {getThemeIcon()}
               </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-2">
-                    <Avatar className="size-8"><AvatarFallback><UserIcon className="size-4" /></AvatarFallback></Avatar>
-                    <span className="hidden sm:inline">{currentUser.email}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>{currentUser.name}</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut}>
-                    <LogOutIcon className="mr-2 size-4" /> 로그아웃
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="flex items-center gap-2">
+                      <Avatar className="size-8"><AvatarFallback><UserIcon className="size-4" /></AvatarFallback></Avatar>
+                      <div className="hidden sm:flex items-center gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsProfileOpen(true);
+                          }}
+                          className="text-primary hover:underline cursor-pointer font-medium"
+                        >
+                          {currentUser.name}
+                        </button>
+                        <span className="text-muted-foreground">({currentUser.email})</span>
+                      </div>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem 
+                      onClick={() => {
+                        setIsProfileOpen(true);
+                      }}
+                      className="text-primary focus:text-primary cursor-pointer"
+                    >
+                      <UserIcon className="mr-2 size-4 text-primary" /> {currentUser.name}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut} className="text-destructive focus:text-destructive">
+                      <LogOutIcon className="mr-2 size-4 text-destructive" /> 로그아웃
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           )}
         </div>
@@ -565,6 +620,84 @@ export default function HomePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 프로필 다이얼로그 */}
+      <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserIcon className="size-5 text-primary" />
+              사용자 프로필
+            </DialogTitle>
+            <DialogDescription>
+              {currentUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {/* 완료율 */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">완료율</span>
+                <span className="text-2xl font-bold text-primary">{profileStats.completionRate}%</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${profileStats.completionRate}%` }}
+                />
+              </div>
+            </div>
+
+            {/* 할 일 리스트 개수 */}
+            <div className="rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">전체 할 일</span>
+                <span className="text-xl font-bold">{profileStats.totalTodos}개</span>
+              </div>
+              <div className="mt-2 text-sm text-muted-foreground">
+                완료: {profileStats.completedTodos}개 / 미완료: {profileStats.totalTodos - profileStats.completedTodos}개
+              </div>
+            </div>
+
+            {/* 우선순위별 통계 */}
+            <div className="space-y-3">
+              <span className="text-sm font-medium">우선순위별 통계</span>
+              <div className="space-y-2">
+                {/* 높음 */}
+                <div className="rounded-lg border p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="destructive">높음</Badge>
+                    <span className="text-sm font-medium">{profileStats.priorityStats.high.total}개</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    완료: {profileStats.priorityStats.high.completed}개
+                  </div>
+                </div>
+                {/* 중간 */}
+                <div className="rounded-lg border p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="default">중간</Badge>
+                    <span className="text-sm font-medium">{profileStats.priorityStats.medium.total}개</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    완료: {profileStats.priorityStats.medium.completed}개
+                  </div>
+                </div>
+                {/* 낮음 */}
+                <div className="rounded-lg border p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="secondary">낮음</Badge>
+                    <span className="text-sm font-medium">{profileStats.priorityStats.low.total}개</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    완료: {profileStats.priorityStats.low.completed}개
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

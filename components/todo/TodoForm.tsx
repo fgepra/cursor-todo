@@ -77,6 +77,30 @@ export function TodoForm({
     },
   });
 
+  // todo prop이 변경될 때 폼 값을 업데이트
+  React.useEffect(() => {
+    if (todo) {
+      form.reset({
+        title: todo.title ?? "",
+        description: todo.description ?? "",
+        due_date: todo.due_date
+          ? new Date(todo.due_date).toISOString().slice(0, 16)
+          : "",
+        priority: todo.priority ?? "medium",
+        category: todo.category ?? "",
+      });
+    } else {
+      // 새 할 일 추가 모드일 때 폼 초기화
+      form.reset({
+        title: "",
+        description: "",
+        due_date: "",
+        priority: "medium",
+        category: "",
+      });
+    }
+  }, [todo, form]);
+
   const handleSubmit = async (data: TodoFormValues) => {
     const formData: TodoFormData = {
       ...data,
